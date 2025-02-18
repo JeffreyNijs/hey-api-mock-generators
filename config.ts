@@ -7,7 +7,7 @@ export const defaultConfig: Plugin.Config<Config> = {
     _handler: handler,
     _handlerLegacy: () => {
     },
-    name: '@hey-api/mock-generators',
+    name: 'hey-api-mock-generators',
     output: 'generators',
 }
 
