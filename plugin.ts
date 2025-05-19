@@ -31,6 +31,13 @@ function toPascalCase(str: string) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+function sanitizeMethodName(prop: string) {
+    // Remove non-alphanumeric characters and convert to PascalCase
+    return prop
+        .replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => chr.toUpperCase())
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .replace(/^(.)/, (m) => m.toUpperCase());
+}
 
 export const handler: Plugin.Handler<any> = ({context, plugin}) => {
     const schemas: Record<string, any> = {};
@@ -77,7 +84,7 @@ export function create${builderClassName}() {
             let withMethods = '';
             if (resolvedSchema.properties) {
                 for (const prop of Object.keys(resolvedSchema.properties)) {
-                    const methodName = `with${toPascalCase(prop)}`;
+                    const methodName = `with${sanitizeMethodName(prop)}`;
                     withMethods += `
   public ${methodName}(value: types.${typeName}["${prop}"]): this {
     this.overrides["${prop}"] = value;
