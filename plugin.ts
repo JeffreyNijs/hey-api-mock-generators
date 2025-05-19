@@ -27,6 +27,10 @@ function resolveRefs(schema: any, allSchemas: Record<string, any>): any {
     return schema;
 }
 
+function toPascalCase(str: string) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 
 export const handler: Plugin.Handler<any> = ({context, plugin}) => {
     const schemas: Record<string, any> = {};
@@ -50,14 +54,36 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
             if (!schema || typeof schema !== 'object') continue;
 
             const resolvedSchema = resolveRefs(schema, schemas);
-            const typeName = schemaName.replace(/Schema$/, '')
-            const mockFunctionName = `generate${schemaName.replace(/Schema$/, '')}`;
-            const returnType = `types.${typeName}`;
+            const typeName = schemaName.replace(/Schema$/, '');
+            const builderClassName = `${typeName}Builder`;
 
-            outputContent += `export function ${mockFunctionName}(): ${returnType} {
-  return generateMock(${JSON.stringify(resolvedSchema, null, 2)}) as ${returnType};
+            let withMethods = '';
+            if (resolvedSchema.properties) {
+                for (const prop of Object.keys(resolvedSchema.properties)) {
+                    const methodName = `with${toPascalCase(prop)}`;
+                    withMethods += `
+  public ${methodName}(value: types.${typeName}["${prop}"]): this {
+    this.overrides["${prop}"] = value;
+    return this;
+  }
+`;
+                }
+            }
+
+            outputContent += `
+export class ${builderClassName} {
+  private overrides: Partial<types.${typeName}> = {};
+
+  ${withMethods}
+  public build(): types.${typeName} {
+    const mock = generateMock(${JSON.stringify(resolvedSchema, null, 2)}) as types.${typeName};
+    return { ...mock, ...this.overrides };
+  }
 }
 
+export function create${builderClassName}() {
+  return new ${builderClassName}();
+}
 `;
         }
 

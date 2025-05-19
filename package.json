@@ -1,6 +1,6 @@
 {
   "name": "hey-api-mock-generators",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "A custom plugin for @hey-api/openapi-ts that wraps JSON Schema Faker to generate mock generators.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
