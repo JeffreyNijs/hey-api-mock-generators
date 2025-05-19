@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "jest"
   },
   "keywords": [
     "json-schema-faker",
@@ -32,6 +32,9 @@
   },
   "devDependencies": {
     "@types/node": "22.13.4",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
   }
 }

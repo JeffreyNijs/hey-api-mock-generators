@@ -88,6 +88,16 @@ defineBuildersConfig({
   - A `build()` method that generates a mock object using JSON Schema Faker, applying any overrides you set.
 - Factory functions (`create<SchemaName>Builder`) are also generated for convenience.
 
+## Running Tests
+
+To run the tests, use the following command:
+
+```bash
+pnpm test
+```
+
+This will execute the tests using Jest and provide you with the test results.
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/JeffreyNijs/hey-api-builders).
