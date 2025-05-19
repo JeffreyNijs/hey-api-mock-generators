@@ -54,8 +54,25 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
             if (!schema || typeof schema !== 'object') continue;
 
             const resolvedSchema = resolveRefs(schema, schemas);
-            const typeName = schemaName.replace(/Schema$/, '').trim();
+            const typeName = schemaName.replace(/Schema$/, '');
             const builderClassName = `${typeName}Builder`;
+
+            const isEnum = resolvedSchema.type === 'enum'
+
+            if (isEnum) {
+                outputContent += `
+export class ${builderClassName} {
+  public build(): types.${typeName} {
+    return generateMock(${JSON.stringify(resolvedSchema, null, 2)}) as types.${typeName};
+  }
+}
+
+export function create${builderClassName}() {
+  return new ${builderClassName}();
+}
+`;
+                continue;
+            }
 
             let withMethods = '';
             if (resolvedSchema.properties) {
@@ -90,3 +107,4 @@ export function create${builderClassName}() {
         file.add(outputContent);
     });
 };
+
