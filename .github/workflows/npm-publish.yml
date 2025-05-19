@@ -26,6 +26,9 @@ jobs:
       - name: Build 🔨
         run: pnpm build
 
+      - name: Run tests 🧪
+        run: pnpm test
+
       - uses: simenandre/publish-with-pnpm@v2
         with:
           npm-auth-token: ${{ secrets.NPM_TOKEN }}
