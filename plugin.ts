@@ -54,7 +54,7 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
             if (!schema || typeof schema !== 'object') continue;
 
             const resolvedSchema = resolveRefs(schema, schemas);
-            const typeName = schemaName.replace(/Schema$/, '');
+            const typeName = schemaName.replace(/Schema$/, '').trim();
             const builderClassName = `${typeName}Builder`;
 
             const isEnum = resolvedSchema.type === 'enum'
