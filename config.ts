@@ -4,10 +4,10 @@ import { handler } from "./plugin";
 
 export const defaultConfig: Plugin.Config<Config> = {
     _dependencies: ['@hey-api/schemas', '@hey-api/typescript'],
-    _handler: handler,
+    _handler: handler as Plugin.Handler<Config>,
     _handlerLegacy: () => {},
-    name: 'hey-api-mock-generators',
-    output: 'generators',
+    name: 'hey-api-builders',
+    output: 'builders',
     exportFromIndex: true,
 };
 

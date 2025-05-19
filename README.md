@@ -1,86 +1,101 @@
-# hey-api-mock-generators
+# hey-api-builders
 
-**hey-api-mock-generators** is a custom plugin for the [Hey API](https://heyapi.dev/openapi-ts/) that generates mock data generators based on your OpenAPI schemas. By leveraging [JSON Schema Faker](https://github.com/json-schema-faker/json-schema-faker), this plugin automates the creation of mock data, facilitating testing and development.
+**hey-api-builders** is a custom plugin for the [Hey API](https://heyapi.dev/openapi-ts/) ecosystem that generates TypeScript builder classes for mock data based on your OpenAPI schemas. By leveraging [JSON Schema Faker](https://github.com/json-schema-faker/json-schema-faker), this plugin automates the creation of flexible mock data builders, making testing and prototyping easier.
 
 ## Features
 
-- **Automated Mock Data Generation:** Creates TypeScript functions that generate mock data for each of your OpenAPI schemas.
-- **Seamless Integration:** Designed to work effortlessly with Hey API's existing plugins and workflows.
-- **Highly Configurable:** Offers options to tailor the output to your project's specific needs.
+- **Builder Pattern for Mock Data:** Generates a TypeScript builder class for each OpenAPI schema, allowing you to override specific fields and generate mock objects.
+- **Automatic Reference Resolution:** Handles `$ref` and schema composition, so your builders reflect your OpenAPI definitions accurately.
+- **Seamless Integration:** Designed to work with Hey API's plugin system and TypeScript type generation.
+- **Configurable Output:** Choose the output filename and other options to fit your project structure.
 
 ## Installation
 
-To include **hey-api-mock-generators** in your project, follow these steps:
+Add **hey-api-builders** to your project:
 
-1. **Install the Plugin:**
-
-   ```bash
-   npm install hey-api-mock-generators
-   ```
-
-   Alternatively, if you're using Yarn:
-
-   ```bash
-   yarn add hey-api-mock-generators
-   ```
-
-2. **Update Your OpenAPI Configuration:**
-
-   In your `openapi.config.ts` file, import and configure the plugin:
-
-   ```typescript
-   import { defineConfig } from '@hey-api/openapi-ts';
-   import { defineConfig as defineJSFConfig } from 'hey-api-mock-generators';
-
-   export default defineConfig({
-     input: 'path/to/your/openapi.yaml',
-     output: 'src/client',
-     plugins: [
-       // Other plugins...
-       defineJSFConfig({
-         // Optional: plugin-specific configurations
-       }),
-     ],
-   });
-   ```
-
-## Usage
-
-Once configured, running the Hey API code generation will produce a file (default: `generators.gen.ts`) containing mock generator functions for your schemas.
-
-```typescript
-// Example usage in your code
-import { UserGenerator } from './client/generators.gen';
-
-const mockUser = UserGenerator();
-console.log(mockUser);
+```bash
+npm install hey-api-builders
 ```
 
-Each generator function corresponds to a schema in your OpenAPI specification and returns a mock object adhering to that schema.
+Or with Yarn:
 
-## Configuration Options
+```bash
+yarn add hey-api-builders
+```
 
-The plugin accepts the following options:
+## Configuration
 
-- **name** (string): The unique name of the plugin. Default is `'hey-api-mock-generators'`.
-- **output** (string): The filename for the generated mock generators. Default is `'generators.gen.ts'`.
-
-These options can be passed when defining the plugin in your configuration:
+In your `openapi.config.ts`, register the plugin:
 
 ```typescript
-defineJSFConfig({
-  output: 'custom-generators.ts',
+import { defineConfig } from '@hey-api/openapi-ts';
+import { defineConfig as defineBuildersConfig } from 'hey-api-builders';
+
+export default defineConfig({
+  input: 'path/to/your/openapi.yaml',
+  output: 'src/client',
+  plugins: [
+    // ...other plugins
+    defineBuildersConfig({
+      // Optional: plugin-specific options
+      // output: 'builders.gen.ts'
+    }),
+  ],
 });
 ```
 
+## Usage
+
+After running the Hey API code generation, you'll get a file (default: `builders`) containing builder classes for each schema.
+
+Example usage:
+
+```typescript
+import { UserBuilder, createUserBuilder } from './client/builders';
+
+// Using the builder class directly
+const user = new UserBuilder()
+  .withName('Alice')
+  .withEmail('alice@example.com')
+  .build();
+
+// Or using the factory function
+const user2 = createUserBuilder()
+  .withName('Bob')
+  .build();
+```
+
+- Each builder class provides `with<Property>` methods for each property in the schema, allowing you to override default mock values.
+- The `build()` method returns a mock object conforming to your schema and TypeScript types.
+
+## Configuration Options
+
+- **name** (string): Unique plugin name. Default: `'hey-api-builders'`.
+- **output** (string): Output filename (without extension) for the generated builders. Default: `'builders'`.
+
+Example:
+
+```typescript
+defineBuildersConfig({
+  output: 'custom-builders',
+});
+```
+
+## How It Works
+
+- For each schema, a builder class is generated with:
+  - `with<Property>(value)` methods for each property.
+  - A `build()` method that generates a mock object using JSON Schema Faker, applying any overrides you set.
+- Factory functions (`create<SchemaName>Builder`) are also generated for convenience.
+
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/yourusername/hey-api-mock-generators).
+Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/JeffreyNijs/hey-api-builders).
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+MIT License. See [LICENSE](./LICENSE) for details.
 
 ---
 
-By integrating **hey-api-mock-generators** into your project, you streamline the process of generating mock data, enhancing both development and testing workflows.
+By integrating **hey-api-builders** into your workflow, you can quickly generate and customize mock data for testing and development, all strongly typed and based on your OpenAPI schemas.

@@ -2,7 +2,7 @@ export interface Config {
     /**
      * Plugin name. Must be unique.
      */
-    name: 'hey-api-mock-generators',
+    name: 'hey-api-builders',
     /**
      * Name of the generated file.
      *
