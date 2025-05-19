@@ -1,7 +1,7 @@
 {
-  "name": "hey-api-mock-generators",
-  "version": "0.2.0",
-  "description": "A custom plugin for @hey-api/openapi-ts that wraps JSON Schema Faker to generate mock generators.",
+  "name": "hey-api-builders",
+  "version": "0.3.1",
+  "description": "A custom plugin for @hey-api/openapi-ts that wraps JSON Schema Faker to generate builders.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -21,7 +21,7 @@
   "packageManager": "pnpm@10.4.1",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JeffreyNijs/hey-api-mock-generators.git"
+    "url": "https://github.com/JeffreyNijs/hey-api-builders.git"
   },
   "dependencies": {
     "@hey-api/openapi-ts": "0.64.4",

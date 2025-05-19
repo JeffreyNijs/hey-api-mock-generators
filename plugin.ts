@@ -47,7 +47,7 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
             path: plugin.output,
         });
 
-        let outputContent = 'import { generateMock } from "hey-api-mock-generators";\n';
+        let outputContent = 'import { generateMock } from "hey-api-builders";\n';
         outputContent += 'import type * as types from "./types.gen";\n\n';
 
         for (const [schemaName, schema] of Object.entries(schemas)) {
