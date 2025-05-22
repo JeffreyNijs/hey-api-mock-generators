@@ -64,13 +64,20 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
             const typeName = schemaName.replace(/Schema$/, '').trim();
             const builderClassName = `${typeName}Builder`;
 
-            const isEnum = resolvedSchema.type === 'enum'
+            const isEnum = resolvedSchema.type === 'enum';
 
             if (isEnum) {
+                // Convert to valid JSON Schema enum
+                const enumValues = resolvedSchema.items?.map((item: any) => item.const) || [];
+                const enumSchema = {
+                  ...resolvedSchema,
+                  type: 'string',
+                  enum: enumValues,
+                };
                 outputContent += `
 export class ${builderClassName} {
   public build(): types.${typeName} {
-    return generateMock(${JSON.stringify(resolvedSchema, null, 2)}) as types.${typeName};
+    return generateMock(${JSON.stringify(enumSchema, null, 2)}) as types.${typeName};
   }
 }
 
@@ -79,6 +86,24 @@ export function create${builderClassName}() {
 }
 `;
                 continue;
+            }
+
+            // Patch any enum property types in object schemas
+            if (resolvedSchema.properties) {
+                for (const [prop, propSchemaRaw] of Object.entries(resolvedSchema.properties)) {
+                    const propSchema = propSchemaRaw as Record<string, any>;
+                    if (propSchema && propSchema["type"] === "enum") {
+                        // Convert to valid JSON Schema enum
+                        const enumValues = Array.isArray(propSchema["items"])
+                            ? propSchema["items"].map((item: any) => item.const)
+                            : [];
+                        resolvedSchema.properties[prop] = {
+                            ...propSchema,
+                            type: "string",
+                            enum: enumValues,
+                        };
+                    }
+                }
             }
 
             let withMethods = '';
