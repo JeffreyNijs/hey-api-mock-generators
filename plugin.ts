@@ -102,6 +102,28 @@ export function create${builderClassName}() {
                             type: "string",
                             enum: enumValues,
                         };
+                    } else if (
+                        propSchema &&
+                        Array.isArray(propSchema.items) &&
+                        propSchema.logicalOperator === "or"
+                    ) {
+                        // Convert custom union type representation to standard JSON Schema union
+                        const types = propSchema.items.map((item: any) => item.type).filter(Boolean);
+                        if (types.length > 0) {
+                            resolvedSchema.properties[prop] = {
+                                ...propSchema,
+                                type: types.length === 1 ? types[0] : types,
+                            };
+                            delete resolvedSchema.properties[prop].items;
+                            delete resolvedSchema.properties[prop].logicalOperator;
+                        } else {
+                            // fallback: use anyOf if types are not clear
+                            resolvedSchema.properties[prop] = {
+                                anyOf: propSchema.items,
+                            };
+                            delete resolvedSchema.properties[prop].items;
+                            delete resolvedSchema.properties[prop].logicalOperator;
+                        }
                     }
                 }
             }
