@@ -99,7 +99,21 @@ export class ${builderClassName} {
   private overrides: Partial<types.${typeName}> = {};
 
   ${withMethods}
+  /**
+   * Build with all fields set to null (using json-schema-faker config for nulls)
+   */
   public build(): types.${typeName} {
+    const mock = generateMock({
+      ...${JSON.stringify(resolvedSchema, null, 2)},
+      "x-faker-null": true
+    }) as types.${typeName};
+    return { ...mock, ...this.overrides };
+  }
+
+  /**
+   * Build with mock data for all fields not defined in overrides
+   */
+  public buildWithMock(): types.${typeName} {
     const mock = generateMock(${JSON.stringify(resolvedSchema, null, 2)}) as types.${typeName};
     return { ...mock, ...this.overrides };
   }
