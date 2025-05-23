@@ -2,17 +2,12 @@ import type {Plugin} from '@hey-api/openapi-ts';
 
 function resolveRefs(schema: any, allSchemas: Record<string, any>): any {
     if (!schema) return schema;
-
     if (schema.$ref) {
         const refPath = schema.$ref.replace('#/components/schemas/', '');
         const resolved = allSchemas[refPath] || allSchemas[`${refPath}Schema`];
-        if (!resolved) {
-            console.warn(`Reference not found for ${schema.$ref}`);
-            return schema;
-        }
+        if (!resolved) return schema;
         return resolveRefs(resolved, allSchemas);
     }
-
     if (schema.properties) {
         for (const key in schema.properties) {
             schema.properties[key] = resolveRefs(schema.properties[key], allSchemas);
@@ -27,12 +22,7 @@ function resolveRefs(schema: any, allSchemas: Record<string, any>): any {
     return schema;
 }
 
-function toPascalCase(str: string) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 function sanitizeMethodName(prop: string) {
-    // Remove non-alphanumeric characters and convert to PascalCase
     return prop
         .replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => chr.toUpperCase())
         .replace(/[^a-zA-Z0-9]/g, '')
@@ -41,33 +31,35 @@ function sanitizeMethodName(prop: string) {
 
 export const handler: Plugin.Handler<any> = ({context, plugin}) => {
     const schemas: Record<string, any> = {};
-
     context.subscribe('schema', ({name, schema}) => {
         if (schema && typeof schema === 'object') {
             schemas[name] = schema;
         }
     });
-
     context.subscribe('after', () => {
         const file = context.createFile({
             id: plugin.name,
             path: plugin.output,
         });
-
         let outputContent = 'import { generateMock } from "hey-api-builders";\n';
         outputContent += 'import type * as types from "./types.gen";\n\n';
-
         for (const [schemaName, schema] of Object.entries(schemas)) {
             if (!schema || typeof schema !== 'object') continue;
-
             const resolvedSchema = resolveRefs(schema, schemas);
             const typeName = schemaName.replace(/Schema$/, '').trim();
             const builderClassName = `${typeName}Builder`;
-
             const isEnum = resolvedSchema.type === 'enum';
-
+            const builderOptionsType = `_${builderClassName}Options`;
+            outputContent += `
+type ${builderOptionsType} = {
+  useDefault?: boolean;
+  useExamples?: boolean;
+  alwaysIncludeOptionals?: boolean;
+  optionalsProbability?: number | false;
+  omitNulls?: boolean;
+};
+`;
             if (isEnum) {
-                // Convert to valid JSON Schema enum
                 const enumValues = resolvedSchema.items?.map((item: any) => item.const) || [];
                 const enumSchema = {
                   ...resolvedSchema,
@@ -76,24 +68,28 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
                 };
                 outputContent += `
 export class ${builderClassName} {
-  public build(): types.${typeName} {
-    return generateMock(${JSON.stringify(enumSchema, null, 2)}) as types.${typeName};
+  private options: ${builderOptionsType} = {};
+  setOptions(options: ${builderOptionsType}) { this.options = options || {}; return this; }
+  build(): types.${typeName} {
+    return generateMock(${JSON.stringify(enumSchema, null, 2)}, {
+      useDefaultValue: this.options.useDefault,
+      useExamplesValue: this.options.useExamples,
+      alwaysFakeOptionals: this.options.alwaysIncludeOptionals,
+      optionalsProbability: this.options.optionalsProbability,
+      omitNulls: this.options.omitNulls,
+    }) as types.${typeName};
   }
 }
-
 export function create${builderClassName}() {
   return new ${builderClassName}();
 }
 `;
                 continue;
             }
-
-            // Patch any enum property types in object schemas
             if (resolvedSchema.properties) {
                 for (const [prop, propSchemaRaw] of Object.entries(resolvedSchema.properties)) {
                     const propSchema = propSchemaRaw as Record<string, any>;
                     if (propSchema && propSchema["type"] === "enum") {
-                        // Convert to valid JSON Schema enum
                         const enumValues = Array.isArray(propSchema["items"])
                             ? propSchema["items"].map((item: any) => item.const)
                             : [];
@@ -107,7 +103,6 @@ export function create${builderClassName}() {
                         Array.isArray(propSchema.items) &&
                         propSchema.logicalOperator === "or"
                     ) {
-                        // Convert custom union type representation to standard JSON Schema union
                         const types = propSchema.items.map((item: any) => item.type).filter(Boolean);
                         if (types.length > 0) {
                             resolvedSchema.properties[prop] = {
@@ -117,7 +112,6 @@ export function create${builderClassName}() {
                             delete resolvedSchema.properties[prop].items;
                             delete resolvedSchema.properties[prop].logicalOperator;
                         } else {
-                            // fallback: use anyOf if types are not clear
                             resolvedSchema.properties[prop] = {
                                 anyOf: propSchema.items,
                             };
@@ -127,51 +121,35 @@ export function create${builderClassName}() {
                     }
                 }
             }
-
             let withMethods = '';
             if (resolvedSchema.properties) {
                 for (const prop of Object.keys(resolvedSchema.properties)) {
                     const methodName = `with${sanitizeMethodName(prop)}`;
-                    withMethods += `
-  public ${methodName}(value: types.${typeName}["${prop}"]): this {
-    this.overrides["${prop}"] = value;
-    return this;
-  }
-`;
+                    withMethods += `\n  ${methodName}(value: types.${typeName}[\"${prop}\"]): this {\n    this.overrides[\"${prop}\"] = value;\n    return this;\n  }`;
                 }
             }
-
             outputContent += `
 export class ${builderClassName} {
   private overrides: Partial<types.${typeName}> = {};
-
+  private options: ${builderOptionsType} = {};
+  setOptions(options: ${builderOptionsType}) { this.options = options || {}; return this; }
   ${withMethods}
-  /**
-   * Build with all fields set to null (using json-schema-faker config for nulls)
-   */
-  public build(): types.${typeName} {
-    const mock = generateMock({
-      ...${JSON.stringify(resolvedSchema, null, 2)},
-      "x-faker-null": true
+  build(): types.${typeName} {
+    const mock = generateMock(${JSON.stringify(resolvedSchema, null, 2)}, {
+      useDefaultValue: this.options.useDefault,
+      useExamplesValue: this.options.useExamples,
+      alwaysFakeOptionals: this.options.alwaysIncludeOptionals,
+      optionalsProbability: this.options.optionalsProbability,
+      omitNulls: this.options.omitNulls,
     }) as types.${typeName};
     return { ...mock, ...this.overrides };
   }
-
-  /**
-   * Build with mock data for all fields not defined in overrides
-   */
-  public buildWithMock(): types.${typeName} {
-    const mock = generateMock(${JSON.stringify(resolvedSchema, null, 2)}) as types.${typeName};
-    return { ...mock, ...this.overrides };
-  }
 }
-
 export function create${builderClassName}() {
   return new ${builderClassName}();
 }
 `;
         }
-
         file.add(outputContent);
     });
 };
