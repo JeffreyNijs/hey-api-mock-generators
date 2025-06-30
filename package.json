@@ -24,8 +24,8 @@
     "url": "https://github.com/JeffreyNijs/hey-api-builders.git"
   },
   "dependencies": {
-    "@hey-api/openapi-ts": "0.64.4",
-    "json-schema-faker": "0.5.8"
+    "@hey-api/openapi-ts": "0.64.15",
+    "json-schema-faker": "0.5.9"
   },
   "peerDependencies": {
     "@hey-api/openapi-ts": "^0.63.2"
