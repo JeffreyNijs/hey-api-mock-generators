@@ -33,6 +33,69 @@ function sanitizeMethodName(prop: string) {
         .replace(/^(.)/, (m) => m.toUpperCase());
 }
 
+function getBuilderOptionsType(builderClassName: string) {
+    return `_${builderClassName}Options`;
+}
+
+function getBuilderOptionsTypeDef(builderOptionsType: string) {
+    return `type ${builderOptionsType} = {\n  useDefault?: boolean;\n  useExamples?: boolean;\n  alwaysIncludeOptionals?: boolean;\n  optionalsProbability?: number | false;\n  omitNulls?: boolean;\n};\n`;
+}
+
+function generateEnumBuilderClass(typeName: string, builderClassName: string, builderOptionsType: string, resolvedSchema: any) {
+    const enumValues = resolvedSchema.items?.map((item: any) => item.const) || [];
+    const enumSchema = {
+        ...resolvedSchema,
+        type: 'string',
+        enum: enumValues,
+    };
+    return `
+export class ${builderClassName} {
+  private options: ${builderOptionsType} = {};
+  setOptions(options: ${builderOptionsType}) { this.options = options || {}; return this; }
+  build(): types.${typeName} {
+    return generateMock(${JSON.stringify(enumSchema, null, 2)}, {
+      useDefaultValue: this.options.useDefault,
+      useExamplesValue: this.options.useExamples,
+      alwaysFakeOptionals: this.options.alwaysIncludeOptionals,
+      optionalsProbability: this.options.optionalsProbability,
+      omitNulls: this.options.omitNulls,
+    }) as types.${typeName};
+  }
+}
+`;
+}
+
+function generateWithMethods(resolvedSchema: any, typeName: string) {
+    if (!resolvedSchema.properties) return '';
+    return Object.keys(resolvedSchema.properties)
+        .map((prop) => {
+            const methodName = `with${sanitizeMethodName(prop)}`;
+            return `  ${methodName}(value: types.${typeName}[\"${prop}\"]): this {\n    this.overrides[\"${prop}\"] = value;\n    return this;\n  }`;
+        })
+        .join('\n');
+}
+
+function generateObjectBuilderClass(typeName: string, builderClassName: string, builderOptionsType: string, resolvedSchema: any) {
+    const withMethods = generateWithMethods(resolvedSchema, typeName);
+    return `
+export class ${builderClassName} {
+  private overrides: Partial<types.${typeName}> = {};
+  private options: ${builderOptionsType} = {};
+  setOptions(options: ${builderOptionsType}) { this.options = options || {}; return this; }
+${withMethods ? withMethods + '\n' : ''}  build(): types.${typeName} {
+    const mock = generateMock(${JSON.stringify(resolvedSchema, null, 2)}, {
+      useDefaultValue: this.options.useDefault,
+      useExamplesValue: this.options.useExamples,
+      alwaysFakeOptionals: this.options.alwaysIncludeOptionals,
+      optionalsProbability: this.options.optionalsProbability,
+      omitNulls: this.options.omitNulls,
+    }) as types.${typeName};
+    return { ...mock, ...this.overrides };
+  }
+}
+`;
+}
+
 export const handler: Plugin.Handler<any> = ({context, plugin}) => {
     const schemas: Record<string, any> = {};
     context.subscribe('schema', ({name, schema}) => {
@@ -53,106 +116,49 @@ export const handler: Plugin.Handler<any> = ({context, plugin}) => {
             const typeName = schemaName.replace(/Schema$/, '').trim();
             const builderClassName = `${typeName}Builder`;
             const isEnum = resolvedSchema.type === 'enum';
-            const builderOptionsType = `_${builderClassName}Options`;
-            outputContent += `
-type ${builderOptionsType} = {
-  useDefault?: boolean;
-  useExamples?: boolean;
-  alwaysIncludeOptionals?: boolean;
-  optionalsProbability?: number | false;
-  omitNulls?: boolean;
-};
-`;
+            const builderOptionsType = getBuilderOptionsType(builderClassName);
+            outputContent += getBuilderOptionsTypeDef(builderOptionsType);
             if (isEnum) {
-                const enumValues = resolvedSchema.items?.map((item: any) => item.const) || [];
-                const enumSchema = {
-                  ...resolvedSchema,
-                  type: 'string',
-                  enum: enumValues,
-                };
-                outputContent += `
-export class ${builderClassName} {
-  private options: ${builderOptionsType} = {};
-  setOptions(options: ${builderOptionsType}) { this.options = options || {}; return this; }
-  build(): types.${typeName} {
-    return generateMock(${JSON.stringify(enumSchema, null, 2)}, {
-      useDefaultValue: this.options.useDefault,
-      useExamplesValue: this.options.useExamples,
-      alwaysFakeOptionals: this.options.alwaysIncludeOptionals,
-      optionalsProbability: this.options.optionalsProbability,
-      omitNulls: this.options.omitNulls,
-    }) as types.${typeName};
-  }
-}
-export function create${builderClassName}() {
-  return new ${builderClassName}();
-}
-`;
-                continue;
-            }
-            if (resolvedSchema.properties) {
-                for (const [prop, propSchemaRaw] of Object.entries(resolvedSchema.properties)) {
-                    const propSchema = propSchemaRaw as Record<string, any>;
-                    if (propSchema && propSchema["type"] === "enum") {
-                        const enumValues = Array.isArray(propSchema["items"])
-                            ? propSchema["items"].map((item: any) => item.const)
-                            : [];
-                        resolvedSchema.properties[prop] = {
-                            ...propSchema,
-                            type: "string",
-                            enum: enumValues,
-                        };
-                    } else if (
-                        propSchema &&
-                        Array.isArray(propSchema.items) &&
-                        propSchema.logicalOperator === "or"
-                    ) {
-                        const types = propSchema.items.map((item: any) => item.type).filter(Boolean);
-                        if (types.length > 0) {
+                outputContent += generateEnumBuilderClass(typeName, builderClassName, builderOptionsType, resolvedSchema);
+            } else {
+                // Clean up enum/union properties for object schemas
+                if (resolvedSchema.properties) {
+                    for (const [prop, propSchemaRaw] of Object.entries(resolvedSchema.properties)) {
+                        const propSchema = propSchemaRaw as Record<string, any>;
+                        if (propSchema && propSchema["type"] === "enum") {
+                            const enumValues = Array.isArray(propSchema["items"])
+                                ? propSchema["items"].map((item: any) => item.const)
+                                : [];
                             resolvedSchema.properties[prop] = {
                                 ...propSchema,
-                                type: types.length === 1 ? types[0] : types,
+                                type: "string",
+                                enum: enumValues,
                             };
-                            delete resolvedSchema.properties[prop].items;
-                            delete resolvedSchema.properties[prop].logicalOperator;
-                        } else {
-                            resolvedSchema.properties[prop] = {
-                                anyOf: propSchema.items,
-                            };
-                            delete resolvedSchema.properties[prop].items;
-                            delete resolvedSchema.properties[prop].logicalOperator;
+                        } else if (
+                            propSchema &&
+                            Array.isArray(propSchema.items) &&
+                            propSchema.logicalOperator === "or"
+                        ) {
+                            const types = propSchema.items.map((item: any) => item.type).filter(Boolean);
+                            if (types.length > 0) {
+                                resolvedSchema.properties[prop] = {
+                                    ...propSchema,
+                                    type: types.length === 1 ? types[0] : types,
+                                };
+                                delete resolvedSchema.properties[prop].items;
+                                delete resolvedSchema.properties[prop].logicalOperator;
+                            } else {
+                                resolvedSchema.properties[prop] = {
+                                    anyOf: propSchema.items,
+                                };
+                                delete resolvedSchema.properties[prop].items;
+                                delete resolvedSchema.properties[prop].logicalOperator;
+                            }
                         }
                     }
                 }
+                outputContent += generateObjectBuilderClass(typeName, builderClassName, builderOptionsType, resolvedSchema);
             }
-            let withMethods = '';
-            if (resolvedSchema.properties) {
-                for (const prop of Object.keys(resolvedSchema.properties)) {
-                    const methodName = `with${sanitizeMethodName(prop)}`;
-                    withMethods += `\n  ${methodName}(value: types.${typeName}[\"${prop}\"]): this {\n    this.overrides[\"${prop}\"] = value;\n    return this;\n  }`;
-                }
-            }
-            outputContent += `
-export class ${builderClassName} {
-  private overrides: Partial<types.${typeName}> = {};
-  private options: ${builderOptionsType} = {};
-  setOptions(options: ${builderOptionsType}) { this.options = options || {}; return this; }
-  ${withMethods}
-  build(): types.${typeName} {
-    const mock = generateMock(${JSON.stringify(resolvedSchema, null, 2)}, {
-      useDefaultValue: this.options.useDefault,
-      useExamplesValue: this.options.useExamples,
-      alwaysFakeOptionals: this.options.alwaysIncludeOptionals,
-      optionalsProbability: this.options.optionalsProbability,
-      omitNulls: this.options.omitNulls,
-    }) as types.${typeName};
-    return { ...mock, ...this.overrides };
-  }
-}
-export function create${builderClassName}() {
-  return new ${builderClassName}();
-}
-`;
         }
         file.add(outputContent);
     });
