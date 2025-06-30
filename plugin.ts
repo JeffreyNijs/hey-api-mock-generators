@@ -54,9 +54,10 @@ function stableStringify(obj: any): string {
 function generateWithMethods(resolvedSchema: any, typeName: string) {
     if (!resolvedSchema.properties) return '';
     return Object.keys(resolvedSchema.properties)
+        .filter((prop) => !prop.includes('[') && !prop.includes(']')) // skip bracket notation keys
         .map((prop) => {
             const methodName = `with${sanitizeMethodName(prop)}`;
-            return `  ${methodName}(value: types.${typeName}[\"${prop}\"]): this {\n    this.overrides[\"${prop}\"] = value;\n    return this;\n  }`;
+            return `  ${methodName}(value: types.${typeName}["${prop}"]): this {\n    this.overrides["${prop}"] = value;\n    return this;\n  }`;
         })
         .join('\n');
 }
