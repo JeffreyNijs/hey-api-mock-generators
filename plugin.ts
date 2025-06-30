@@ -14,7 +14,11 @@ function resolveRefs(schema: any, allSchemas: Record<string, any>): any {
         }
     }
     if (schema.items) {
-        schema.items = resolveRefs(schema.items, allSchemas);
+        if (Array.isArray(schema.items)) {
+            schema.items = schema.items.map((item: any) => resolveRefs(item, allSchemas));
+        } else {
+            schema.items = resolveRefs(schema.items, allSchemas);
+        }
     }
     if (schema.allOf) {
         schema.allOf = schema.allOf.map((item: any) => resolveRefs(item, allSchemas));
@@ -153,4 +157,3 @@ export function create${builderClassName}() {
         file.add(outputContent);
     });
 };
-
